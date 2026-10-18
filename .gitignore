@@ -1,0 +1,12 @@
+# secrets and login data
+.env
+data/
+
+# databases
+*.db
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.pyc
