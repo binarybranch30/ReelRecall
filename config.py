@@ -1,6 +1,10 @@
 from dotenv import load_dotenv 
 import os
 
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+SESSION_PATH = os.path.join(DATA_DIR, "session.json")
+DB_PATH = os.path.join(DATA_DIR, "reels.db")
+
 load_dotenv()
 
 username = os.getenv("IG_USERNAME")
