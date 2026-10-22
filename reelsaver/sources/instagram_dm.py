@@ -8,10 +8,11 @@ from pathlib import Path
 from instagrapi import Client
 
 import config
-from reelsaver.models import Share
+from reelsaver.models import Share, TextMessage, order_key
 from reelsaver.sources.base import ShareSource
 
 SHORTCODE_RE = re.compile(r"/(?:reel|reels)/([A-Za-z0-9_-]+)")
+
 
 def _field(obj, name):
     if obj is None:
@@ -86,7 +87,6 @@ class InstagramDMSource(ShareSource):
         url = _field(_field(msg, "xma_share"), "video_url")
 
         if not url:
-            # Fallback: the same link also appears in the raw XMA data.
             clips = (_field(msg, "raw_xma") or {}).get("xma_clip") or []
             if clips:
                 url = clips[0].get("target_url")
@@ -107,22 +107,43 @@ class InstagramDMSource(ShareSource):
             raw_type=str(msg.item_type),
         )
 
-    def get_new_shares(self, since: datetime | None = None) -> list[Share]:
+    def _to_text(self, msg) -> TextMessage | None:
+        text = (msg.text or "").strip()
+        if not text:
+            return None
+        return TextMessage(
+            message_id=str(msg.id),
+            thread_id=str(msg.thread_id),
+            sender_id=str(msg.user_id),
+            timestamp=msg.timestamp,
+            text=text,
+        )
+
+    def get_new_messages(self, since: datetime | None = None) -> tuple[list[Share], list[TextMessage]]:
         client = self._login()
         sender_id = self._get_sender_id(client)
 
         messages = self._fetch("main", client.direct_threads)
-        time.sleep(random.uniform(2, 5))   
+        time.sleep(random.uniform(2, 5))
         messages += self._fetch("pending", client.direct_pending_inbox)
 
-        found: dict[str, Share] = {}       
+        shares: dict[str, Share] = {}
+        texts: dict[str, TextMessage] = {}
         for msg in messages:
-            if str(msg.user_id) != sender_id or str(msg.item_type) != "xma_clip":
+            if str(msg.user_id) != sender_id:
                 continue
-            if since is not None and msg.timestamp < since:  
+            if since is not None and msg.timestamp < since:
                 continue
-            share = self._to_share(msg)
-            if share is not None:
-                found[share.message_id] = share
 
-        return sorted(found.values(), key=lambda s: (s.timestamp, int(s.message_id)))
+            kind = str(msg.item_type)
+            if kind == "xma_clip":
+                share = self._to_share(msg)
+                if share is not None:
+                    shares[share.message_id] = share
+            elif kind == "text":
+                text = self._to_text(msg)
+                if text is not None:
+                    texts[text.message_id] = text
+
+        return (sorted(shares.values(), key=order_key),
+                sorted(texts.values(), key=order_key))
