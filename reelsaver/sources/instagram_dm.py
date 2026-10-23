@@ -79,8 +79,7 @@ class InstagramDMSource(ShareSource):
         except Exception as e:
             text = str(e)
             first_line = text.splitlines()[0] if text else ""
-            print(f"[{label}] fetch failed: {type(e).__name__}: {first_line}")
-            return []
+            raise RuntimeError(f"[{label}] fetch failed: {type(e).__name__}: {first_line}") from None
         return [m for t in threads for m in t.messages]
 
     def _to_share(self, msg) -> Share | None:

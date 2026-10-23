@@ -8,7 +8,7 @@ from reelsaver.models import Share
 
 @pytest.fixture
 def conn():
-    connection = db.connect(":memory:")   # a throwaway database in RAM
+    connection = db.connect(":memory:")
     db.init_db(connection)
     yield connection
     connection.close()
@@ -60,3 +60,9 @@ def test_resume_point_is_newest_reel_in_local_time(conn):
     db.upsert_share(conn, make_share("A", early, msg_id="1"))
     db.upsert_share(conn, make_share("B", late, msg_id="2"))
     assert db.get_resume_point(conn) == late
+
+
+def test_save_shares_is_all_or_nothing(conn):
+    with pytest.raises(AttributeError):
+        db.save_shares(conn, [make_share("A"), "not a share"])
+    assert count(conn) == 0
